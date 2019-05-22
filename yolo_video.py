@@ -3,7 +3,7 @@ import argparse
 from yolo import YOLO, detect_video
 from PIL import Image
 
-def detect_img(yolo):
+def detect_img(yolo):#类方法
     while True:
         img = input('Input image filename:')
         try:
@@ -12,7 +12,7 @@ def detect_img(yolo):
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image(image)
+            r_image = yolo.detect_image(image)#类方法调用
             r_image.show()
     yolo.close_session()
 
@@ -68,10 +68,10 @@ if __name__ == '__main__':
         Image detection mode, disregard any remaining command line arguments
         """
         print("Image detection mode")
-        if "input" in FLAGS:
+        if "input" in FLAGS:#确定是图片检测模式还是视频检测模式
             print(" Ignoring remaining command line arguments: " + FLAGS.input + "," + FLAGS.output)
-        detect_img(YOLO(**vars(FLAGS)))
+        detect_img(YOLO(**vars(FLAGS)))#类方法
     elif "input" in FLAGS:
-        detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)
+        detect_video(YOLO(**vars(FLAGS)), FLAGS.input, FLAGS.output)#类方法
     else:
         print("Must specify at least video_input_path.  See usage with --help.")
