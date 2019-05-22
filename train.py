@@ -18,9 +18,9 @@ def _main():
     log_dir = 'logs/000/'
     classes_path = 'model_data/voc_classes.txt'
     anchors_path = 'model_data/yolo_anchors.txt'
-    class_names = get_classes(classes_path)
-    num_classes = len(class_names)
-    anchors = get_anchors(anchors_path)
+    class_names = get_classes(classes_path)#[类名称]
+    num_classes = len(class_names)#80
+    anchors = get_anchors(anchors_path)#[9*2]
 
     input_shape = (416,416) # multiple of 32, hw
 
@@ -30,7 +30,7 @@ def _main():
             freeze_body=2, weights_path='model_data/tiny_yolo_weights.h5')
     else:
         model = create_model(input_shape, anchors, num_classes,
-            freeze_body=2, weights_path='model_data/yolo_weights.h5') # make sure you know what you freeze
+            freeze_body=2, weights_path='model_data/yolo_weights.h5') # make sure you know what you freeze主函数（[416,416],[9*2],80）
 
     logging = TensorBoard(log_dir=log_dir)
     checkpoint = ModelCheckpoint(log_dir + 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5',
@@ -87,14 +87,14 @@ def _main():
     # Further training if needed.
 
 
-def get_classes(classes_path):
+def get_classes(classes_path):#读入类名称列表
     '''loads the classes'''
     with open(classes_path) as f:
         class_names = f.readlines()
     class_names = [c.strip() for c in class_names]
     return class_names
 
-def get_anchors(anchors_path):
+def get_anchors(anchors_path):#返回9*2的anchors
     '''loads the anchors from a file'''
     with open(anchors_path) as f:
         anchors = f.readline()
@@ -107,16 +107,17 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
     '''create the training model'''
     K.clear_session() # get a new session
     image_input = Input(shape=(None, None, 3))
-    h, w = input_shape
-    num_anchors = len(anchors)
+    h, w = input_shape#416,416
+    num_anchors = len(anchors)#9
 
     y_true = [Input(shape=(h//{0:32, 1:16, 2:8}[l], w//{0:32, 1:16, 2:8}[l], \
-        num_anchors//3, num_classes+5)) for l in range(3)]
+        num_anchors//3, num_classes+5)) for l in range(3)]#3个FPN层的输出，分别为下采样32，16，8的结果，但每个都有相同的通道数，大小
+    #分别为13*13，26*26，52*52
 
-    model_body = yolo_body(image_input, num_anchors//3, num_classes)
+    model_body = yolo_body(image_input, num_anchors//3, num_classes)#主体函数（（416，416），9//3，80）
     print('Create YOLOv3 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
 
-    if load_pretrained:
+    if load_pretrained:#预训练权重载入
         model_body.load_weights(weights_path, by_name=True, skip_mismatch=True)
         print('Load weights {}.'.format(weights_path))
         if freeze_body in [1, 2]:
@@ -127,8 +128,8 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
 
     model_loss = Lambda(yolo_loss, output_shape=(1,), name='yolo_loss',
         arguments={'anchors': anchors, 'num_classes': num_classes, 'ignore_thresh': 0.5})(
-        [*model_body.output, *y_true])
-    model = Model([model_body.input, *y_true], model_loss)
+        [*model_body.output, *y_true])#损失函数
+    model = Model([model_body.input, *y_true], model_loss)#输入为input，和y_true，输出为model_loss
 
     return model
 
