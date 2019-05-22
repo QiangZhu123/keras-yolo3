@@ -18,11 +18,11 @@ from yolo3.utils import letterbox_image
 import os
 from keras.utils import multi_gpu_model
 
-class YOLO(object):
+class YOLO(object):#YOLO类
     _defaults = {
         "model_path": 'model_data/yolo.h5',
-        "anchors_path": 'model_data/yolo_anchors.txt',
-        "classes_path": 'model_data/coco_classes.txt',
+        "anchors_path": 'model_data/yolo_anchors.txt',#10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326
+        "classes_path": 'model_data/coco_classes.txt',#类名称
         "score" : 0.3,
         "iou" : 0.45,
         "model_image_size" : (416, 416),
@@ -30,7 +30,7 @@ class YOLO(object):
     }
 
     @classmethod
-    def get_defaults(cls, n):
+    def get_defaults(cls, n):#载入字典信息
         if n in cls._defaults:
             return cls._defaults[n]
         else:
@@ -44,14 +44,14 @@ class YOLO(object):
         self.sess = K.get_session()
         self.boxes, self.scores, self.classes = self.generate()
 
-    def _get_class(self):
+    def _get_class(self):#读入类名称，返回列表
         classes_path = os.path.expanduser(self.classes_path)
         with open(classes_path) as f:
             class_names = f.readlines()
         class_names = [c.strip() for c in class_names]
         return class_names
 
-    def _get_anchors(self):
+    def _get_anchors(self):#读入anchors，数组9*2，9个anchors
         anchors_path = os.path.expanduser(self.anchors_path)
         with open(anchors_path) as f:
             anchors = f.readline()
@@ -59,13 +59,13 @@ class YOLO(object):
         return np.array(anchors).reshape(-1, 2)
 
     def generate(self):
-        model_path = os.path.expanduser(self.model_path)
+        model_path = os.path.expanduser(self.model_path)#模型权重
         assert model_path.endswith('.h5'), 'Keras model or weights must be a .h5 file.'
 
         # Load model, or construct model and load weights.
-        num_anchors = len(self.anchors)
-        num_classes = len(self.class_names)
-        is_tiny_version = num_anchors==6 # default setting
+        num_anchors = len(self.anchors)#   9
+        num_classes = len(self.class_names)#类个数=80
+        is_tiny_version = num_anchors==6 # default setting#看anchors的个数决定网络的大小
         try:
             self.yolo_model = load_model(model_path, compile=False)
         except:
@@ -80,6 +80,7 @@ class YOLO(object):
         print('{} model, anchors, and classes loaded.'.format(model_path))
 
         # Generate colors for drawing bounding boxes.
+        #生成对应类的不同颜色
         hsv_tuples = [(x / len(self.class_names), 1., 1.)
                       for x in range(len(self.class_names))]
         self.colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
@@ -99,13 +100,13 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
-    def detect_image(self, image):
+    def detect_image(self, image):#检测图片的主函数
         start = timer()
 
-        if self.model_image_size != (None, None):
+        if self.model_image_size != (None, None):#要求输入的大小要能被32整除，不然下采样结果有偏移
             assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
             assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
-            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))#resize图片，不改变比例，只用padding
         else:
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
@@ -114,7 +115,7 @@ class YOLO(object):
 
         print(image_data.shape)
         image_data /= 255.
-        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.加batch维度
 
         out_boxes, out_scores, out_classes = self.sess.run(
             [self.boxes, self.scores, self.classes],
@@ -122,7 +123,7 @@ class YOLO(object):
                 self.yolo_model.input: image_data,
                 self.input_image_shape: [image.size[1], image.size[0]],
                 K.learning_phase(): 0
-            })
+            })#三个节点
 
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
@@ -150,7 +151,7 @@ class YOLO(object):
                 text_origin = np.array([left, top - label_size[1]])
             else:
                 text_origin = np.array([left, top + 1])
-
+            #画矩形窗的方法
             # My kingdom for a good redistributable image drawing library.
             for i in range(thickness):
                 draw.rectangle(
