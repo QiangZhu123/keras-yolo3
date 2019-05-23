@@ -15,14 +15,14 @@ from yolo3.utils import compose
 
 
 @wraps(Conv2D)
-def DarknetConv2D(*args, **kwargs):
+def DarknetConv2D(*args, **kwargs):#基本卷积模块，类似于slim.variable_scope固定每个卷积层参数
     """Wrapper to set Darknet parameters for Convolution2D."""
     darknet_conv_kwargs = {'kernel_regularizer': l2(5e-4)}
     darknet_conv_kwargs['padding'] = 'valid' if kwargs.get('strides')==(2,2) else 'same'
     darknet_conv_kwargs.update(kwargs)
     return Conv2D(*args, **darknet_conv_kwargs)
 
-def DarknetConv2D_BN_Leaky(*args, **kwargs):
+def DarknetConv2D_BN_Leaky(*args, **kwargs):#卷积层+BN+leakyrelu激活
     """Darknet Convolution2D followed by BatchNormalization and LeakyReLU."""
     no_bias_kwargs = {'use_bias': False}
     no_bias_kwargs.update(kwargs)
@@ -31,7 +31,7 @@ def DarknetConv2D_BN_Leaky(*args, **kwargs):
         BatchNormalization(),
         LeakyReLU(alpha=0.1))
 
-def resblock_body(x, num_filters, num_blocks):
+def resblock_body(x, num_filters, num_blocks):#残差模块
     '''A series of resblocks starting with a downsampling Convolution2D'''
     # Darknet uses left and top padding instead of 'same' mode
     x = ZeroPadding2D(((1,0),(1,0)))(x)
@@ -43,7 +43,7 @@ def resblock_body(x, num_filters, num_blocks):
         x = Add()([x,y])
     return x
 
-def darknet_body(x):
+def darknet_body(x):#模型主干前部分，由残差模块叠加组成
     '''Darknent body having 52 Convolution2D layers'''
     x = DarknetConv2D_BN_Leaky(32, (3,3))(x)
     x = resblock_body(x, 64, 1)
@@ -53,7 +53,7 @@ def darknet_body(x):
     x = resblock_body(x, 1024, 4)
     return x
 
-def make_last_layers(x, num_filters, out_filters):
+def make_last_layers(x, num_filters, out_filters):#将卷积层结果进行FPN层处理，输出一个下一层的输入值和当前层的预测值
     '''6 Conv2D_BN_Leaky layers followed by a Conv2D_linear layer'''
     x = compose(
             DarknetConv2D_BN_Leaky(num_filters, (1,1)),
@@ -69,22 +69,22 @@ def make_last_layers(x, num_filters, out_filters):
 
 def yolo_body(inputs, num_anchors, num_classes):
     """Create YOLO_V3 model CNN body in Keras."""
-    darknet = Model(inputs, darknet_body(inputs))
-    x, y1 = make_last_layers(darknet.output, 512, num_anchors*(num_classes+5))
+    darknet = Model(inputs, darknet_body(inputs))#主干网络前半部分
+    x, y1 = make_last_layers(darknet.output, 512, num_anchors*(num_classes+5))#第一层FPN输出和预测
 
     x = compose(
             DarknetConv2D_BN_Leaky(256, (1,1)),
-            UpSampling2D(2))(x)
-    x = Concatenate()([x,darknet.layers[152].output])
-    x, y2 = make_last_layers(x, 256, num_anchors*(num_classes+5))
+            UpSampling2D(2))(x)#这里使用上采样，
+    x = Concatenate()([x,darknet.layers[152].output])#融合方式为concat
+    x, y2 = make_last_layers(x, 256, num_anchors*(num_classes+5))#第二层FPN
 
     x = compose(
             DarknetConv2D_BN_Leaky(128, (1,1)),
-            UpSampling2D(2))(x)
-    x = Concatenate()([x,darknet.layers[92].output])
-    x, y3 = make_last_layers(x, 128, num_anchors*(num_classes+5))
+            UpSampling2D(2))(x)#上采样
+    x = Concatenate()([x,darknet.layers[92].output])#融合
+    x, y3 = make_last_layers(x, 128, num_anchors*(num_classes+5))#第三层FPN
 
-    return Model(inputs, [y1,y2,y3])
+    return Model(inputs, [y1,y2,y3])#一个输入图片，三个预测结果为输出
 
 def tiny_yolo_body(inputs, num_anchors, num_classes):
     '''Create Tiny YOLO_v3 model CNN body in keras.'''
@@ -121,23 +121,31 @@ def tiny_yolo_body(inputs, num_anchors, num_classes):
 
 def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     """Convert final layer features to bounding box parameters."""
-    num_anchors = len(anchors)
-    # Reshape to batch, height, width, num_anchors, box_params.
-    anchors_tensor = K.reshape(K.constant(anchors), [1, 1, 1, num_anchors, 2])
+    num_anchors = len(anchors)#9
+    # Reshape to [batch, height, width, num_anchors, box_params].
+    anchors_tensor = K.reshape(K.constant(anchors), [1, 1, 1, num_anchors, 2])#将结果进行reshape，分离出每个anchor的对应部分[1,1,1,9,2]
 
     grid_shape = K.shape(feats)[1:3] # height, width
+    #这里是要做cx,cy的偏移量的处理，要将偏移量加到预测值上，生成的才是结果
+    #cy为0～12
     grid_y = K.tile(K.reshape(K.arange(0, stop=grid_shape[0]), [-1, 1, 1, 1]),
         [1, grid_shape[1], 1, 1])
+    #cx为0～12
+    #grid_y和grid_x用于生成网格grid，通过arange、reshape、tile的组合， 创建y轴的0~12的组合grid_y，
+    #再创建x轴的0~12的组合grid_x，将两者拼接concatenate，就是grid；grid+到预测生成的结果就是利用公式sim(tx)+cx
     grid_x = K.tile(K.reshape(K.arange(0, stop=grid_shape[1]), [1, -1, 1, 1]),
         [grid_shape[0], 1, 1, 1])
     grid = K.concatenate([grid_x, grid_y])
     grid = K.cast(grid, K.dtype(feats))
 
+    #将feats的最后一维展开，将anchors与其他数据（类别数+9个框值+框置信度）分离
     feats = K.reshape(
         feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
 
     # Adjust preditions to each spatial grid point and anchor size.
+    #这里就是利用文中的公式进行计算(K.sigmoid(feats[..., :2]) + grid)，后半部分是保证生成的结果和feats是同一数据格式
     box_xy = (K.sigmoid(feats[..., :2]) + grid) / K.cast(grid_shape[::-1], K.dtype(feats))
+    #这里就是利用文中的公式进行计算K.exp(feats[..., 2:4]) * anchors_tensor，后半部分是保证生成的结果和feats是同一数据格式
     box_wh = K.exp(feats[..., 2:4]) * anchors_tensor / K.cast(input_shape[::-1], K.dtype(feats))
     box_confidence = K.sigmoid(feats[..., 4:5])
     box_class_probs = K.sigmoid(feats[..., 5:])
@@ -147,7 +155,7 @@ def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     return box_xy, box_wh, box_confidence, box_class_probs
 
 
-def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
+def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):#得到正确的x,y,w,h
     '''Get corrected boxes'''
     box_yx = box_xy[..., ::-1]
     box_hw = box_wh[..., ::-1]
@@ -173,7 +181,7 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):
     return boxes
 
 
-def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape):
+def yolo_boxes_and_scores(feats, anchors, num_classes, input_shape, image_shape):#上面函数的组合
     '''Process Conv layer output'''
     box_xy, box_wh, box_confidence, box_class_probs = yolo_head(feats,
         anchors, num_classes, input_shape)
@@ -192,40 +200,40 @@ def yolo_eval(yolo_outputs,
               score_threshold=.6,
               iou_threshold=.5):
     """Evaluate YOLO model on given input and return filtered boxes."""
-    num_layers = len(yolo_outputs)
+    num_layers = len(yolo_outputs)#[y1,y2,y3],其中y：[m,gird,grid,9,5+1]
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]] # default setting
-    input_shape = K.shape(yolo_outputs[0])[1:3] * 32
+    input_shape = K.shape(yolo_outputs[0])[1:3] * 32#(416,416)
     boxes = []
     box_scores = []
-    for l in range(num_layers):
+    for l in range(num_layers):#9，根据输出的张量个数，输出在输入图像上真实的anchor位置
         _boxes, _box_scores = yolo_boxes_and_scores(yolo_outputs[l],
             anchors[anchor_mask[l]], num_classes, input_shape, image_shape)
         boxes.append(_boxes)
-        box_scores.append(_box_scores)
-    boxes = K.concatenate(boxes, axis=0)
+        box_scores.append(_box_scores)#三个尺度分别转化为实际画框的参数
+    boxes = K.concatenate(boxes, axis=0)#组合成一个
     box_scores = K.concatenate(box_scores, axis=0)
 
-    mask = box_scores >= score_threshold
+    mask = box_scores >= score_threshold#筛选满足要求的iou的boxes
     max_boxes_tensor = K.constant(max_boxes, dtype='int32')
     boxes_ = []
     scores_ = []
     classes_ = []
     for c in range(num_classes):
         # TODO: use keras backend instead of tf.
-        class_boxes = tf.boolean_mask(boxes, mask[:, c])
+        class_boxes = tf.boolean_mask(boxes, mask[:, c])#挑出iou满足最小要求的boxes
         class_box_scores = tf.boolean_mask(box_scores[:, c], mask[:, c])
         nms_index = tf.image.non_max_suppression(
-            class_boxes, class_box_scores, max_boxes_tensor, iou_threshold=iou_threshold)
-        class_boxes = K.gather(class_boxes, nms_index)
-        class_box_scores = K.gather(class_box_scores, nms_index)
-        classes = K.ones_like(class_box_scores, 'int32') * c
+            class_boxes, class_box_scores, max_boxes_tensor, iou_threshold=iou_threshold)#用nms去除掉重叠超过要求的多余bos
+        class_boxes = K.gather(class_boxes, nms_index)#用nms去除掉重叠超过要求的多余bos
+        class_box_scores = K.gather(class_box_scores, nms_index)#用nms去除掉重叠超过要求的多余bos
+        classes = K.ones_like(class_box_scores, 'int32') * c#把类型变成一个整数而非'00...1...000'的形式
         boxes_.append(class_boxes)
         scores_.append(class_box_scores)
         classes_.append(classes)
     boxes_ = K.concatenate(boxes_, axis=0)
     scores_ = K.concatenate(scores_, axis=0)
     classes_ = K.concatenate(classes_, axis=0)
-
+#返回三个列表存储相关信息
     return boxes_, scores_, classes_
 
 
@@ -248,19 +256,19 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
     assert (true_boxes[..., 4]<num_classes).all(), 'class id must be less than num_classes'
     num_layers = len(anchors)//3 # default setting
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]]
-
-    true_boxes = np.array(true_boxes, dtype='float32')
+    #boxes为[x1,y1,x2,y2]
+    true_boxes = np.array(true_boxes, dtype='float32')#shape(图片张数，每张图片box个数，5)
     input_shape = np.array(input_shape, dtype='int32')
-    boxes_xy = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) // 2
-    boxes_wh = true_boxes[..., 2:4] - true_boxes[..., 0:2]
-    true_boxes[..., 0:2] = boxes_xy/input_shape[::-1]
-    true_boxes[..., 2:4] = boxes_wh/input_shape[::-1]
+    boxes_xy = (true_boxes[..., 0:2] + true_boxes[..., 2:4]) // 2#将每个box的左上点和右下点坐标相加除2，即取中点！
+    boxes_wh = true_boxes[..., 2:4] - true_boxes[..., 0:2]#将每个box的(x2-x1,y2-y1)，即宽和高，
+    true_boxes[..., 0:2] = boxes_xy/input_shape[::-1]#除以416
+    true_boxes[..., 2:4] = boxes_wh/input_shape[::-1]#除以416
 
     m = true_boxes.shape[0]
     grid_shapes = [input_shape//{0:32, 1:16, 2:8}[l] for l in range(num_layers)]
     y_true = [np.zeros((m,grid_shapes[l][0],grid_shapes[l][1],len(anchor_mask[l]),5+num_classes),
         dtype='float32') for l in range(num_layers)]
-
+#[(m,13,13,3,5+num_classes),(m,26,26,3,5+num_classes),(m,52,52,3,5+num_classes)] #3是每个grid预测三个bbox
     # Expand dim to apply broadcasting.
     anchors = np.expand_dims(anchors, 0)
     anchor_maxes = anchors / 2.
@@ -298,6 +306,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
                     y_true[l][b, j, i, k, 4] = 1
                     y_true[l][b, j, i, k, 5+c] = 1
 
+    #[(None,13,13,3,5+num_classes),(None,26,26,3,5+num_classes),(None,52,52,3,5+num_classes)]
     return y_true
 
 
@@ -358,7 +367,8 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=.5, print_loss=False):
     loss: tensor, shape=(1,)
 
     '''
-    num_layers = len(anchors)//3 # default setting
+    #args即[*model_body.output, *y_true]
+    num_layers = len(anchors)//3 # default settin这里是三
     yolo_outputs = args[:num_layers]
     y_true = args[num_layers:]
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]]
