@@ -368,22 +368,24 @@ def yolo_loss(args, anchors, num_classes, ignore_thresh=.5, print_loss=False):
 
     '''
     #args即[*model_body.output, *y_true]
-    num_layers = len(anchors)//3 # default settin这里是三
+    num_layers = len(anchors)//3 # default settin这里是3
+    #model_body.output = [y1,y2,y3]即三个尺度的预测结果,每个y都是m*grid*grid*num_anchors*(num_classes+5)
     yolo_outputs = args[:num_layers]
     y_true = args[num_layers:]
     anchor_mask = [[6,7,8], [3,4,5], [0,1,2]] if num_layers==3 else [[3,4,5], [1,2,3]]
-    input_shape = K.cast(K.shape(yolo_outputs[0])[1:3] * 32, K.dtype(y_true[0]))
+    input_shape = K.cast(K.shape(yolo_outputs[0])[1:3] * 32, K.dtype(y_true[0]))#(416,416)
     grid_shapes = [K.cast(K.shape(yolo_outputs[l])[1:3], K.dtype(y_true[0])) for l in range(num_layers)]
+    #得到三个grid的大小
     loss = 0
     m = K.shape(yolo_outputs[0])[0] # batch size, tensor
     mf = K.cast(m, K.dtype(yolo_outputs[0]))
 
     for l in range(num_layers):
-        object_mask = y_true[l][..., 4:5]
-        true_class_probs = y_true[l][..., 5:]
+        object_mask = y_true[l][..., 4:5]#置信率物体性
+        true_class_probs = y_true[l][..., 5:]#分类
 
         grid, raw_pred, pred_xy, pred_wh = yolo_head(yolo_outputs[l],
-             anchors[anchor_mask[l]], num_classes, input_shape, calc_loss=True)
+             anchors[anchor_mask[l]], num_classes, input_shape, calc_loss=True)#计算损失时使用该函数，返回grid, feats, box_xy, box_wh
         pred_box = K.concatenate([pred_xy, pred_wh])
 
         # Darknet raw box to calculate loss.
