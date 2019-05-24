@@ -141,7 +141,7 @@ def yolo_head(feats, anchors, num_classes, input_shape, calc_loss=False):
     #将feats的最后一维展开，将anchors与其他数据（类别数+9个框值+框置信度）分离
     feats = K.reshape(
         feats, [-1, grid_shape[0], grid_shape[1], num_anchors, num_classes + 5])
-
+        #分出的张量中每个表示一个anchor的预测类别，对每一个都要加上grid，而且要加在前2个值上（x,y,w,h,conf,class）如下所示
     # Adjust preditions to each spatial grid point and anchor size.
     #这里就是利用文中的公式进行计算(K.sigmoid(feats[..., :2]) + grid)，后半部分是保证生成的结果和feats是同一数据格式
     box_xy = (K.sigmoid(feats[..., :2]) + grid) / K.cast(grid_shape[::-1], K.dtype(feats))
@@ -166,7 +166,8 @@ def yolo_correct_boxes(box_xy, box_wh, input_shape, image_shape):#得到正确�
     scale = input_shape/new_shape
     box_yx = (box_yx - offset) * scale
     box_hw *= scale
-
+    
+#转换成适配不同图片本身的box尺寸
     box_mins = box_yx - (box_hw / 2.)
     box_maxes = box_yx + (box_hw / 2.)
     boxes =  K.concatenate([
@@ -237,7 +238,7 @@ def yolo_eval(yolo_outputs,
     return boxes_, scores_, classes_
 
 
-def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):
+def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):#将给定的标注box信息转化为张量的形式，三个结果
     '''Preprocess true boxes to training input format
 
     Parameters
