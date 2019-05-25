@@ -14,10 +14,10 @@ from yolo3.utils import get_random_data
 
 
 def _main():
-    annotation_path = 'train.txt'
-    log_dir = 'logs/000/'
-    classes_path = 'model_data/voc_classes.txt'
-    anchors_path = 'model_data/yolo_anchors.txt'
+    annotation_path = 'train.txt'#用于训练的文本
+    log_dir = 'logs/000/'#保存路径
+    classes_path = 'model_data/voc_classes.txt'#类名称路径
+    anchors_path = 'model_data/yolo_anchors.txt'#anchor 默认大小
     class_names = get_classes(classes_path)#[类名称]
     num_classes = len(class_names)#80
     anchors = get_anchors(anchors_path)#[9*2]
@@ -34,12 +34,12 @@ def _main():
 
     logging = TensorBoard(log_dir=log_dir)
     checkpoint = ModelCheckpoint(log_dir + 'ep{epoch:03d}-loss{loss:.3f}-val_loss{val_loss:.3f}.h5',
-        monitor='val_loss', save_weights_only=True, save_best_only=True, period=3)
+        monitor='val_loss', save_weights_only=True, save_best_only=True, period=3)#权重
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, verbose=1)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
 
     val_split = 0.1
-    with open(annotation_path) as f:
+    with open(annotation_path) as f:#读入训练数据
         lines = f.readlines()
     np.random.seed(10101)
     np.random.shuffle(lines)
@@ -52,7 +52,7 @@ def _main():
     if True:
         model.compile(optimizer=Adam(lr=1e-3), loss={
             # use custom yolo_loss Lambda layer.
-            'yolo_loss': lambda y_true, y_pred: y_pred})
+            'yolo_loss': lambda y_true, y_pred: y_pred})#定义损失
 
         batch_size = 32
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
@@ -62,7 +62,7 @@ def _main():
                 validation_steps=max(1, num_val//batch_size),
                 epochs=50,
                 initial_epoch=0,
-                callbacks=[logging, checkpoint])
+                callbacks=[logging, checkpoint])#数据生成
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
 
     # Unfreeze and continue training, to fine-tune.
@@ -71,7 +71,7 @@ def _main():
         for i in range(len(model.layers)):
             model.layers[i].trainable = True
         model.compile(optimizer=Adam(lr=1e-4), loss={'yolo_loss': lambda y_true, y_pred: y_pred}) # recompile to apply the change
-        print('Unfreeze all of the layers.')
+        print('Unfreeze all of the layers.')#编译模型
 
         batch_size = 32 # note that more GPU memory is required after unfreezing the body
         print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
