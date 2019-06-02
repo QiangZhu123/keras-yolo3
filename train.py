@@ -38,13 +38,13 @@ def _main():
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, verbose=1)
     early_stopping = EarlyStopping(monitor='val_loss', min_delta=0, patience=10, verbose=1)
 
-    val_split = 0.1
+    val_split = 0.1#验证集划分站10%
     with open(annotation_path) as f:#读入训练数据
         lines = f.readlines()
     np.random.seed(10101)
     np.random.shuffle(lines)
     np.random.seed(None)
-    num_val = int(len(lines)*val_split)
+    num_val = int(len(lines)*val_split)#划分数据列表
     num_train = len(lines) - num_val
 
     # Train with frozen layers first, to get a stable loss.
@@ -52,17 +52,17 @@ def _main():
     if True:
         model.compile(optimizer=Adam(lr=1e-3), loss={
             # use custom yolo_loss Lambda layer.
-            'yolo_loss': lambda y_true, y_pred: y_pred})#定义损失
+            'yolo_loss': lambda y_true, y_pred: y_pred})#编译模型
 
         batch_size = 32
-        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))
+        print('Train on {} samples, val on {} samples, with batch size {}.'.format(num_train, num_val, batch_size))#打印训练、验证集大小
         model.fit_generator(data_generator_wrapper(lines[:num_train], batch_size, input_shape, anchors, num_classes),
                 steps_per_epoch=max(1, num_train//batch_size),
                 validation_data=data_generator_wrapper(lines[num_train:], batch_size, input_shape, anchors, num_classes),
                 validation_steps=max(1, num_val//batch_size),
                 epochs=50,
                 initial_epoch=0,
-                callbacks=[logging, checkpoint])#数据生成
+                callbacks=[logging, checkpoint])#
         model.save_weights(log_dir + 'trained_weights_stage_1.h5')
 
     # Unfreeze and continue training, to fine-tune.
@@ -111,8 +111,8 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
     num_anchors = len(anchors)#9
 
     y_true = [Input(shape=(h//{0:32, 1:16, 2:8}[l], w//{0:32, 1:16, 2:8}[l], \
-        num_anchors//3, num_classes+5)) for l in range(3)]#3个FPN层的输出，分别为下采样32，16，8的结果，但每个都有相同的通道数，大小
-    #分别为13*13，26*26，52*52
+        num_anchors//3, num_classes+5)) for l in range(3)]#和3个FPN层的输出一样大的GT层，分别为下采样32，16，8的结果，但每个都有相同的通道数，大小
+    #分别为13*13，26*26，52*52，这里就体现要求输入大小要能被整除
 
     model_body = yolo_body(image_input, num_anchors//3, num_classes)#主体函数（（416，416），9//3，80）
     print('Create YOLOv3 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
