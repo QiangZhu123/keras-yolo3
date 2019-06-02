@@ -30,7 +30,7 @@ class YOLO(object):#YOLO类
     }
 
     @classmethod
-    def get_defaults(cls, n):#载入字典信息
+    def get_defaults(cls, n):#载入字典信息，返回默认的指定参数，即上面字典中的某个参数默认值
         if n in cls._defaults:
             return cls._defaults[n]
         else:
@@ -39,8 +39,8 @@ class YOLO(object):#YOLO类
     def __init__(self, **kwargs):
         self.__dict__.update(self._defaults) # set up default values
         self.__dict__.update(kwargs) # and update with user overrides
-        self.class_names = self._get_class()
-        self.anchors = self._get_anchors()
+        self.class_names = self._get_class()#所有类名称列表
+        self.anchors = self._get_anchors()#读入anchor，【N,2】
         self.sess = K.get_session()
         self.boxes, self.scores, self.classes = self.generate()
 
@@ -55,7 +55,7 @@ class YOLO(object):#YOLO类
         anchors_path = os.path.expanduser(self.anchors_path)
         with open(anchors_path) as f:
             anchors = f.readline()
-        anchors = [float(x) for x in anchors.split(',')]
+        anchors = [float(x) for x in anchors.split(',')]#10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326
         return np.array(anchors).reshape(-1, 2)
 
     def generate(self):
@@ -63,7 +63,7 @@ class YOLO(object):#YOLO类
         assert model_path.endswith('.h5'), 'Keras model or weights must be a .h5 file.'
 
         # Load model, or construct model and load weights.
-        num_anchors = len(self.anchors)#   9
+        num_anchors = len(self.anchors)#   9   根据读入的anchor个数来确定的，所以可以修改anchors中的个数
         num_classes = len(self.class_names)#类个数=80
         is_tiny_version = num_anchors==6 # default setting#看anchors的个数决定网络的大小
         try:
@@ -82,7 +82,7 @@ class YOLO(object):#YOLO类
         # Generate colors for drawing bounding boxes.
         #生成对应类的不同颜色
         hsv_tuples = [(x / len(self.class_names), 1., 1.)
-                      for x in range(len(self.class_names))]
+                      for x in range(len(self.class_names))]#每个颜色对应（x,1.0,1.0）x和类有关
         self.colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
         self.colors = list(
             map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)),
@@ -110,13 +110,13 @@ class YOLO(object):#YOLO类
         else:
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
-            boxed_image = letterbox_image(image, new_image_size)
+            boxed_image = letterbox_image(image, new_image_size)#否则将他resize到能被32整除的大小
         image_data = np.array(boxed_image, dtype='float32')
 
         print(image_data.shape)
         image_data /= 255.
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.加batch维度
-
+        #图
         out_boxes, out_scores, out_classes = self.sess.run(
             [self.boxes, self.scores, self.classes],
             feed_dict={
