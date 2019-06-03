@@ -234,7 +234,7 @@ def yolo_eval(yolo_outputs,
     boxes_ = K.concatenate(boxes_, axis=0)
     scores_ = K.concatenate(scores_, axis=0)
     classes_ = K.concatenate(classes_, axis=0)
-#返回三个列表存储相关信息
+#返回三个列表存储相关信息,生成的是满足要求的预测结果，而并不是全部的预测
     return boxes_, scores_, classes_
 
 
@@ -268,7 +268,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):#将给
     m = true_boxes.shape[0]
     grid_shapes = [input_shape//{0:32, 1:16, 2:8}[l] for l in range(num_layers)]
     y_true = [np.zeros((m,grid_shapes[l][0],grid_shapes[l][1],len(anchor_mask[l]),5+num_classes),
-        dtype='float32') for l in range(num_layers)]
+        dtype='float32') for l in range(num_layers)]#初始的标签全是0，形状为（m,32,32,3,85）
 #[(m,13,13,3,5+num_classes),(m,26,26,3,5+num_classes),(m,52,52,3,5+num_classes)] #3是每个grid预测三个bbox
     # Expand dim to apply broadcasting.
     anchors = np.expand_dims(anchors, 0)
