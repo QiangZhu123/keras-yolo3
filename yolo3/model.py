@@ -276,7 +276,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):#将给
     anchor_mins = -anchor_maxes
     valid_mask = boxes_wh[..., 0]>0
 
-    for b in range(m):
+    for b in range(m):#m=3
         # Discard zero rows.
         wh = boxes_wh[b, valid_mask[b]]
         if len(wh)==0: continue
@@ -284,7 +284,7 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):#将给
         wh = np.expand_dims(wh, -2)
         box_maxes = wh / 2.
         box_mins = -box_maxes
-
+#--------------------计算iou-----------------------------------
         intersect_mins = np.maximum(box_mins, anchor_mins)
         intersect_maxes = np.minimum(box_maxes, anchor_maxes)
         intersect_wh = np.maximum(intersect_maxes - intersect_mins, 0.)
@@ -292,15 +292,15 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):#将给
         box_area = wh[..., 0] * wh[..., 1]
         anchor_area = anchors[..., 0] * anchors[..., 1]
         iou = intersect_area / (box_area + anchor_area - intersect_area)
-
+#--------------------计算iou-----------------------------------
         # Find best anchor for each true box
         best_anchor = np.argmax(iou, axis=-1)
-
+#--------------------对张量值进行分配-----------------------------------
         for t, n in enumerate(best_anchor):
             for l in range(num_layers):
                 if n in anchor_mask[l]:
-                    i = np.floor(true_boxes[b,t,0]*grid_shapes[l][1]).astype('int32')
-                    j = np.floor(true_boxes[b,t,1]*grid_shapes[l][0]).astype('int32')
+                    i = np.floor(true_boxes[b,t,0]*grid_shapes[l][1]).astype('int32')#提取x坐标
+                    j = np.floor(true_boxes[b,t,1]*grid_shapes[l][0]).astype('int32')#同上为y坐标
                     k = anchor_mask[l].index(n)
                     c = true_boxes[b,t, 4].astype('int32')
                     y_true[l][b, j, i, k, 0:4] = true_boxes[b,t, 0:4]
