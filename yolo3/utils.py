@@ -17,7 +17,7 @@ def compose(*funcs):
     else:
         raise ValueError('Composition of empty sequence not supported.')
 
-def letterbox_image(image, size):
+def letterbox_image(image, size):#将给定的图片变为指定size大小
     '''resize image with unchanged aspect ratio using padding'''
     iw, ih = image.size
     w, h = size
