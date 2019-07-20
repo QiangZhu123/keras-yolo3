@@ -3,7 +3,7 @@ import argparse
 from yolo import YOLO, detect_video
 from PIL import Image
 
-def detect_img(yolo):#类方法
+def detect_img(yolo):#单独用于检测图片的
     while True:
         img = input('Input image filename:')
         try:
@@ -12,7 +12,7 @@ def detect_img(yolo):#类方法
             print('Open Error! Try again!')
             continue
         else:
-            r_image = yolo.detect_image(image)#类方法调用
+            r_image = yolo.detect_image(image)#调用函数
             r_image.show()
     yolo.close_session()
 
