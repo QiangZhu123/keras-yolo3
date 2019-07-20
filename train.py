@@ -112,9 +112,9 @@ def create_model(input_shape, anchors, num_classes, load_pretrained=True, freeze
 
     y_true = [Input(shape=(h//{0:32, 1:16, 2:8}[l], w//{0:32, 1:16, 2:8}[l], \
         num_anchors//3, num_classes+5)) for l in range(3)]#和3个FPN层的输出一样大的GT层，分别为下采样32，16，8的结果，但每个都有相同的通道数，大小
-    #分别为13*13，26*26，52*52，这里就体现要求输入大小要能被整除
+    #分别为13*13，26*26，52*52，这里就体现要求输入大小要能被整除，y_true是三个张量的列表
 
-    model_body = yolo_body(image_input, num_anchors//3, num_classes)#主体函数（（416，416），9//3，80）
+    model_body = yolo_body(image_input, num_anchors//3, num_classes)#主体函数（（None，None，3），9//3，80）
     print('Create YOLOv3 model with {} anchors and {} classes.'.format(num_anchors, num_classes))
 
     if load_pretrained:#预训练权重载入
