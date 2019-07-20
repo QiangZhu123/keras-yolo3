@@ -20,9 +20,9 @@ from keras.utils import multi_gpu_model
 
 class YOLO(object):#YOLO类
     _defaults = {
-        "model_path": 'model_data/yolo.h5',
+        "model_path": 'model_data/yolo.h5',#权重路径
         "anchors_path": 'model_data/yolo_anchors.txt',#10,13,  16,30,  33,23,  30,61,  62,45,  59,119,  116,90,  156,198,  373,326
-        "classes_path": 'model_data/coco_classes.txt',#类名称
+        "classes_path": 'model_data/coco_classes.txt',#类名称文件，person，bicycle，car，motorbike，aeroplane，bus
         "score" : 0.3,
         "iou" : 0.45,
         "model_image_size" : (416, 416),
@@ -111,10 +111,10 @@ class YOLO(object):#YOLO类
             new_image_size = (image.width - (image.width % 32),
                               image.height - (image.height % 32))
             boxed_image = letterbox_image(image, new_image_size)#否则将他resize到能被32整除的大小
-        image_data = np.array(boxed_image, dtype='float32')
+        image_data = np.array(boxed_image, dtype='float32')#变成矩阵形式
 
         print(image_data.shape)
-        image_data /= 255.
+        image_data /= 255.#将图片归一化
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.加batch维度
         #图
         out_boxes, out_scores, out_classes = self.sess.run(
