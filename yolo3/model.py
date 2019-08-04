@@ -285,6 +285,9 @@ def preprocess_true_boxes(true_boxes, input_shape, anchors, num_classes):#将给
         box_maxes = wh / 2.
         box_mins = -box_maxes
 #--------------------计算iou-----------------------------------
+#这里要注意的是，在YOLO最早版本中，并没有对x,y的偏移进行预测，xy是图片出现在的相应cell的中心点，不是像ssd中那样对anchor的坐标偏移进行预测，所以
+#这里直接就将anchor和ground true放在同一个点进行iou计算，原因是因为在yolo3中作者使用了对anchor偏移的预测，发现结果并不理想，所以直接用了
+#yolo原来对xy的预测方式
         intersect_mins = np.maximum(box_mins, anchor_mins)
         intersect_maxes = np.minimum(box_maxes, anchor_maxes)
         intersect_wh = np.maximum(intersect_maxes - intersect_mins, 0.)
